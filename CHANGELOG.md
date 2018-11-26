@@ -1,5 +1,15 @@
 # Change log
 
+## Version 3.1.0
+###fixed
+- import of mutable sets for python 3.8
+
+###added
+- `chop_intervals_that_envelope_range()` method and tests 
+- `search_for_period_that_envelopes_range()` method and tests
+- `search_point_inclusive` method
+- pyproject.toml for poetry build
+
 ## Version 3.0.0
 - Dropped support for Python 2.6, 3.2, and 3.3
 - Add support for Python 3.5 and 3.6

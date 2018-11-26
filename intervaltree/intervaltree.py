@@ -19,13 +19,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+from collections.abc import MutableSet
+from copy import copy
+from numbers import Number
+from warnings import warn
+
+from sortedcontainers import SortedDict
+
 from .interval import Interval
 from .node import Node
-from numbers import Number
-import collections
-from sortedcontainers import SortedDict
-from copy import copy
-from warnings import warn
 
 try:
     xrange  # Python 2?
@@ -34,7 +36,7 @@ except NameError:  # pragma: no cover
 
 
 # noinspection PyBroadException
-class IntervalTree(collections.MutableSet):
+class IntervalTree(MutableSet):
     """
     A binary lookup tree of intervals.
     The intervals contained in the tree are represented using ``Interval(a, b, data)`` objects.
@@ -227,6 +229,7 @@ class IntervalTree(collections.MutableSet):
         >>> IntervalTree([Interval(0, 1)]) == IntervalTree([Interval(0, 1, "x")])
         False
     """
+
     @classmethod
     def from_tuples(cls, tups):
         """
@@ -265,23 +268,23 @@ class IntervalTree(collections.MutableSet):
         :rtype: IntervalTree
         """
         return IntervalTree(iv.copy() for iv in self)
-    
+
     def _add_boundaries(self, interval):
         """
         Records the boundaries of the interval in the boundary table.
         """
         begin = interval.begin
         end = interval.end
-        if begin in self.boundary_table: 
+        if begin in self.boundary_table:
             self.boundary_table[begin] += 1
         else:
             self.boundary_table[begin] = 1
-        
+
         if end in self.boundary_table:
             self.boundary_table[end] += 1
         else:
             self.boundary_table[end] = 1
-    
+
     def _remove_boundaries(self, interval):
         """
         Removes the boundaries of the interval from the boundary table.
@@ -292,19 +295,19 @@ class IntervalTree(collections.MutableSet):
             del self.boundary_table[begin]
         else:
             self.boundary_table[begin] -= 1
-        
+
         if self.boundary_table[end] == 1:
             del self.boundary_table[end]
         else:
             self.boundary_table[end] -= 1
-    
+
     def add(self, interval):
         """
         Adds an interval to the tree, if not already present.
         
         Completes in O(log n) time.
         """
-        if interval in self: 
+        if interval in self:
             return
 
         if interval.is_null():
@@ -319,8 +322,9 @@ class IntervalTree(collections.MutableSet):
             self.top_node = self.top_node.add(interval)
         self.all_intervals.add(interval)
         self._add_boundaries(interval)
+
     append = add
-    
+
     def addi(self, begin, end, data=None):
         """
         Shortcut for add(Interval(begin, end, data)).
@@ -328,8 +332,9 @@ class IntervalTree(collections.MutableSet):
         Completes in O(log n) time.
         """
         return self.add(Interval(begin, end, data))
+
     appendi = addi
-    
+
     def update(self, intervals):
         """
         Given an iterable of intervals, add them to the tree.
@@ -354,15 +359,15 @@ class IntervalTree(collections.MutableSet):
         
         Completes in O(log n) time.
         """
-        #self.verify()
+        # self.verify()
         if interval not in self:
-            #print(self.all_intervals)
+            # print(self.all_intervals)
             raise ValueError
         self.top_node = self.top_node.remove(interval)
         self.all_intervals.remove(interval)
         self._remove_boundaries(interval)
-        #self.verify()
-    
+        # self.verify()
+
     def removei(self, begin, end, data=None):
         """
         Shortcut for remove(Interval(begin, end, data)).
@@ -370,7 +375,7 @@ class IntervalTree(collections.MutableSet):
         Completes in O(log n) time.
         """
         return self.remove(Interval(begin, end, data))
-    
+
     def discard(self, interval):
         """
         Removes an interval from the tree, if present. If not, does 
@@ -383,7 +388,7 @@ class IntervalTree(collections.MutableSet):
         self.all_intervals.discard(interval)
         self.top_node = self.top_node.discard(interval)
         self._remove_boundaries(interval)
-    
+
     def discardi(self, begin, end, data=None):
         """
         Shortcut for discard(Interval(begin, end, data)).
@@ -469,7 +474,7 @@ class IntervalTree(collections.MutableSet):
           * r = size of the search range (this is 1 for a point)
         """
         hitlist = self.search(begin, end)
-        for iv in hitlist: 
+        for iv in hitlist:
             self.remove(iv)
 
     def remove_envelop(self, begin, end):
@@ -504,10 +509,31 @@ class IntervalTree(collections.MutableSet):
                 insertions.add(Interval(iv.begin, begin, iv.data))
             for iv in end_hits:
                 insertions.add(Interval(end, iv.end, iv.data))
-
-        self.remove_envelop(begin, end)
+        self.discard(begin, end)
         self.difference_update(begin_hits)
         self.difference_update(end_hits)
+        self.update(insertions)
+
+    def chop_intervals_that_envelope_range(self, range_begin, range_end, criteria=None, limit=None):
+        """
+        like chop() but only chops intervals that fully envelop a given range
+
+        Can also pass criteria to only chop periods that match data
+
+        Can also limit to only chop a given number of ranges
+        """
+        insertions = set()
+        intervals_that_envelop_range = self.search_for_period_that_envelopes_range(range_begin, range_end)
+        if criteria is not None:
+            intervals_that_envelop_range = {i for i in intervals_that_envelop_range if i.data == criteria}
+        if limit is not None:
+            intervals_that_envelop_range = set(list(intervals_that_envelop_range)[:limit])
+        for i in intervals_that_envelop_range:
+            if i.begin != range_begin:
+                insertions.add(Interval(i.begin, range_begin, i.data))
+            if i.end != range_end:
+                insertions.add(Interval(range_end, i.end, i.data))
+            self.discard(i)
         self.update(insertions)
 
     def slice(self, point, datafunc=None):
@@ -549,19 +575,19 @@ class IntervalTree(collections.MutableSet):
         :rtype: dict of [Interval, set of Interval]
         """
         result = {}
-        
+
         def add_if_nested():
             if parent.contains_interval(child):
                 if parent not in result:
                     result[parent] = set()
                 result[parent].add(child)
-                
+
         long_ivs = sorted(self.all_intervals, key=Interval.length, reverse=True)
         for i, parent in enumerate(long_ivs):
             for child in long_ivs[i + 1:]:
                 add_if_nested()
         return result
-    
+
     def overlaps(self, begin, end=None):
         """
         Returns whether some interval in the tree overlaps the given
@@ -577,7 +603,7 @@ class IntervalTree(collections.MutableSet):
             return self.overlaps_point(begin)
         else:
             return self.overlaps_range(begin.begin, begin.end)
-    
+
     def overlaps_point(self, p):
         """
         Returns whether some interval in the tree overlaps p.
@@ -588,7 +614,7 @@ class IntervalTree(collections.MutableSet):
         if self.is_empty():
             return False
         return bool(self.top_node.contains_point(p))
-    
+
     def overlaps_range(self, begin, end):
         """
         Returns whether some interval in the tree overlaps the given
@@ -606,11 +632,11 @@ class IntervalTree(collections.MutableSet):
         elif self.overlaps_point(begin):
             return True
         return any(
-            self.overlaps_point(bound) 
-            for bound in self.boundary_table 
+            self.overlaps_point(bound)
+            for bound in self.boundary_table
             if begin < bound < end
         )
-    
+
     def split_overlaps(self):
         """
         Finds all intervals with overlapping ranges and splits them
@@ -762,7 +788,7 @@ class IntervalTree(collections.MutableSet):
         :rtype: set of Interval
         """
         return set(self.all_intervals)
-    
+
     def is_empty(self):
         """
         Returns whether the tree is empty.
@@ -813,7 +839,14 @@ class IntervalTree(collections.MutableSet):
                     if iv.begin >= begin and iv.end <= end
                 )
             return result
-    
+
+    def search_for_period_that_envelopes_range(self, begin, end):
+        """
+        returns periods that envelop input range
+        """
+        root = self.top_node
+        return root.search_point_inclusive(begin, set()) & root.search_point_inclusive(end, set())
+
     def begin(self):
         """
         Returns the lower bound of the first interval in the tree.
@@ -823,7 +856,7 @@ class IntervalTree(collections.MutableSet):
         if not self.boundary_table:
             return 0
         return self.boundary_table.keys()[0]
-    
+
     def end(self):
         """
         Returns the upper bound of the last interval in the tree.
@@ -868,7 +901,7 @@ class IntervalTree(collections.MutableSet):
                 print(result)
             else:
                 return result
-        
+
     def verify(self):
         """
         ## FOR DEBUGGING ONLY ##
@@ -920,7 +953,7 @@ class IntervalTree(collections.MutableSet):
                     bound_check[iv.end] = 1
 
             ## Reconstructed boundary table (bound_check) ==? boundary_table
-            assert set(self.boundary_table.keys()) == set(bound_check.keys()),\
+            assert set(self.boundary_table.keys()) == set(bound_check.keys()), \
                 'Error: boundary_table is out of sync with ' \
                 'the intervals in the tree!'
 
@@ -975,7 +1008,6 @@ class IntervalTree(collections.MutableSet):
             return report
         return cumulative
 
-
     def __getitem__(self, index):
         """
         Returns a set of all intervals overlapping the given index or 
@@ -998,7 +1030,7 @@ class IntervalTree(collections.MutableSet):
             return self.search(start, stop)
         except AttributeError:
             return self.search(index)
-    
+
     def __setitem__(self, index, value):
         """
         Adds a new interval to the tree. A shortcut for
@@ -1028,11 +1060,11 @@ class IntervalTree(collections.MutableSet):
         """
         # Removed point-checking code; it might trick the user into
         # thinking that this is O(1), which point-checking isn't.
-        #if isinstance(item, Interval):
+        # if isinstance(item, Interval):
         return item in self.all_intervals
-        #else:
+        # else:
         #    return self.contains_point(item)
-    
+
     def containsi(self, begin, end, data=None):
         """
         Shortcut for (Interval(begin, end, data) in tree).
@@ -1041,7 +1073,7 @@ class IntervalTree(collections.MutableSet):
         :rtype: bool
         """
         return Interval(begin, end, data) in self
-    
+
     def __iter__(self):
         """
         Returns an iterator over all the intervals in the tree.
@@ -1050,8 +1082,9 @@ class IntervalTree(collections.MutableSet):
         :rtype: collections.Iterable[Interval]
         """
         return self.all_intervals.__iter__()
+
     iter = __iter__
-    
+
     def __len__(self):
         """
         Returns how many intervals are in the tree.
@@ -1060,7 +1093,7 @@ class IntervalTree(collections.MutableSet):
         :rtype: int
         """
         return len(self.all_intervals)
-    
+
     def __eq__(self, other):
         """
         Whether two IntervalTrees are equal.
@@ -1069,10 +1102,10 @@ class IntervalTree(collections.MutableSet):
         :rtype: bool
         """
         return (
-            isinstance(other, IntervalTree) and 
-            self.all_intervals == other.all_intervals
+                isinstance(other, IntervalTree) and
+                self.all_intervals == other.all_intervals
         )
-    
+
     def __repr__(self):
         """
         :rtype: str
@@ -1091,4 +1124,3 @@ class IntervalTree(collections.MutableSet):
         :rtype: tuple
         """
         return IntervalTree, (sorted(self.all_intervals),)
-

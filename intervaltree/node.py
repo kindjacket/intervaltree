@@ -299,6 +299,19 @@ class Node(object):
             return self[1].search_point(point, result)
         return result
 
+    def search_point_inclusive(self, point, result):
+        """
+        alternate search point method that includes a point that == the end of a period in result
+        """
+        for k in self.s_center:
+            if k.begin <= point <= k.end:
+                result.add(k)
+        if point < self.x_center and self[0]:
+            return self[0].search_point_inclusive(point, result)
+        elif point > self.x_center and self[1]:
+            return self[1].search_point_inclusive(point, result)
+        return result
+
     def prune(self):
         """
         On a subtree where the root node's s_center is empty,
