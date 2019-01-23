@@ -1,18 +1,34 @@
 # Change log
 
-## Version 3.1.0
-###fixed
-- import of mutable sets for python 3.8
+## Version 4.0.0 (kindjacket edit)
 
-###added
+### added
 - `chop_intervals_that_envelope_range()` method and tests 
 - `search_for_period_that_envelopes_range()` method and tests
 - `search_point_inclusive` method
 - pyproject.toml for poetry build
 
+## Version 3.0.2
+- Fixed:
+    - On some systems, setup.py opened README.md with a non-unicode encoding. My fault for leaving the encoding flapping in the breeze. It's been fixed.
+
+## Version 3.0.1
+- Added:
+    - Travis testing for 3.7 and 3.8-dev. These needed OpenSSL, sudo and Xenial. 3.8-dev is allowed to fail.
+- Fixed:
+    - PyPI wasn't rendering markdown because I didn't tell it what format to use.
+    - Python 2 wasn't installing via pip because of a new utils package. It has been zapped.
+- Maintainers:
+    - TestPyPI version strings use `.postN` as the suffix instead of `bN`, and `N` counts from the latest tagged commit, which should be the last release
+    - Install from TestPyPI works via `make install-testpypi`
+
 ## Version 3.0.0
-- Dropped support for Python 2.6, 3.2, and 3.3
-- Add support for Python 3.5 and 3.6
+- Breaking:
+    - `search(begin, end, strict)` has been replaced with `at(point)`, `overlap(begin, end)`, and `envelop(begin, end)`
+    - `extend(items)` has been deleted, use `update(items)` instead
+    - Methods that take a `strict=True/False` argument now consistently default to `strict=True`
+    - Dropped support for Python 2.6, 3.2, and 3.3
+    - Add support for Python 3.5, 3.6, and 3.7
 - Faster `Interval` overlap checking (@tuxzz, #56)
 - Updated README:
     - new restructuring methods from 2.1.0
@@ -23,10 +39,12 @@
     - `Interval.distance_to()` gave an incorrect distance when passed the `Interval`'s upper boundary
     - `Node.pop_greatest_child()` sometimes forgot to `rotate()` when creating new child nodes. (@escalonn, #41, #42)
     - `IntervalTree.begin()` and `end()` are O(1), not O(n). (@ProgVal, #40)
+    - `intersection_update()` and `symmetric_difference()` and `symmetric_difference_update()` didn't actually work. Now they do.
+    - `collections.abc` deprecation warning no longer happens
 - Maintainers:
-    - use github.com/kennethreitz/pyandoc
+    - PyPi accepts Markdown! Woohoo!
     - reorganize tests
-    - more tests added to improve code coverage (We're at 95%! Woohoo!)
+    - more tests added to improve code coverage (We're at 96%! Yay!)
     - test for issue #4 had a broken import reference
 
 ## Version 2.1.0

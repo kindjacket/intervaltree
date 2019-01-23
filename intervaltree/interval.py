@@ -1,10 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """
 intervaltree: A mutable, self-balancing interval tree for Python 2 and 3.
 Queries may be by point, by range overlap, or by range envelopment.
 
 Interval class
 
-Copyright 2013-2017 Chaim-Leib Halbert
+Copyright 2013-2018 Chaim Leib Halbert
 Modifications copyright 2014 Konstantin Tretyakov
 
 Licensed under the Apache License, Version 2.0 (the "License");
