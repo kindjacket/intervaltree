@@ -1,5 +1,12 @@
 # Change log
 
+## Version 4.1.0 (kindjacket edit)
+
+### changed
+- updated dependencies
+    - removed python 2.7 compatibility
+    - moved pytest to dev dependencies
+
 ## Version 4.0.0 (kindjacket edit)
 
 ### added
